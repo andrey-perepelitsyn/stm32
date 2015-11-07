@@ -76,7 +76,7 @@ uint16_t lcd_init(uint32_t *framebuffer)
 //	lcd_spi_config.SPI_CPOL = SPI_CPOL_High;
 //	lcd_spi_config.SPI_CPHA = SPI_CPHA_2Edge;
 	lcd_spi_config.SPI_NSS = SPI_NSS_Soft;
-	lcd_spi_config.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_64;
+	lcd_spi_config.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;
 	lcd_spi_config.SPI_FirstBit = SPI_FirstBit_MSB;
 	lcd_spi_config.SPI_CRCPolynomial = 7; // ?
 	SPI_Init(LCD_SPI, &lcd_spi_config);

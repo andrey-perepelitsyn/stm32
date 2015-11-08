@@ -25,28 +25,27 @@ void main(void)
 	int i;
 
 	uint32_t fb[96*9/4];
-	unsigned char buf[40];
-
-	// At this stage the system clock should have already been configured
-	// at high speed.
-	trace_printf("Let the show begin! (at %d Hz)\n", SystemCoreClock);
-
-	RCC_GetClocksFreq(&rcc_clocks);
-	trace_printf(
-			"SYSCLK_Frequency:    %8u\n"
-			"HCLK_Frequency:      %8u\n"
-			"PCLK_Frequency:      %8u\n"
-			"ADCCLK_Frequency:    %8u\n"
-			"CECCLK_Frequency:    %8u\n"
-			"I2C1CLK_Frequency:   %8u\n"
-			"USART1CLK_Frequency: %8u\n",
-			rcc_clocks.SYSCLK_Frequency, rcc_clocks.HCLK_Frequency, rcc_clocks.PCLK_Frequency, rcc_clocks.ADCCLK_Frequency,
-			rcc_clocks.CECCLK_Frequency, rcc_clocks.I2C1CLK_Frequency, rcc_clocks.USART1CLK_Frequency);
+	unsigned char buf[200];
 
 	lcd_init(fb);
 	lcd_clear();
 	lcd_set_flags(LCD_FLAG_SCROLL);
-	lcd_puts("Hello, world!\n");
+	RCC_GetClocksFreq(&rcc_clocks);
+	SysTick_Config(10000000L);
+	lcd_fb_show();
+	sprintf(buf,
+			"SYS:   %8lu\n"
+			"AHB:   %8lu\n"
+			"APB:   %8lu\n"
+			"ADC:   %8lu\n"
+			"CEC:   %8lu\n"
+			"I2C1:  %8lu\n"
+			"USART1:%8lu\n"
+			"fb_show():%lu",
+			rcc_clocks.SYSCLK_Frequency, rcc_clocks.HCLK_Frequency, rcc_clocks.PCLK_Frequency, rcc_clocks.ADCCLK_Frequency,
+			rcc_clocks.CECCLK_Frequency, rcc_clocks.I2C1CLK_Frequency, rcc_clocks.USART1CLK_Frequency,
+			10000000UL - SysTick->VAL);
+	lcd_puts(buf);
 
 #ifdef DHT22_ASYNC
 
@@ -61,13 +60,13 @@ void main(void)
 	// using sync version:
 	while (1)
 	{
+		for(i = 0; i < 3000; i++)
+			dht22_wait(SystemCoreClock / 1000);
 		if(dht22_dumb_read_sensor(&dht22) == DHT22_OK)
 			sprintf(buf, "\nt:%d.%d, h:%d.%d", dht22.temperature / 10, dht22.temperature % 10, dht22.humidity / 10, dht22.humidity % 10);
 		else
 			sprintf(buf, "\ngot error %d", dht22.result);
 		lcd_puts(buf);
-		for(i = 0; i < 3000; i++)
-			dht22_wait(SystemCoreClock / 1000);
 	}
 #endif // DHT22_ASYNC
 }

@@ -46,7 +46,7 @@ uint16_t lcd_init(uint32_t *framebuffer)
 	lcd_gpio_config.GPIO_Mode = GPIO_Mode_AF;
 	lcd_gpio_config.GPIO_OType = GPIO_OType_PP;
 	lcd_gpio_config.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	lcd_gpio_config.GPIO_Speed = GPIO_Speed_Level_2;
+	lcd_gpio_config.GPIO_Speed = GPIO_Speed_50MHz;
 
 	// config SCK pin
 	lcd_gpio_config.GPIO_Pin = LCD_SCK_PIN;
@@ -203,17 +203,30 @@ void lcd_putc(int c)
 		if(c >= 0xC0 && c <= 0xFF)
 			// cyrillic starts in font array at index 95
 			lcd_fb_write_raw(&(lcd_chars6x8[c - 0xC0 + 95][0]), 6);
-		else if(c == '\n') {
-			// newline is the only control char supported:)
-			// just print spaces until cursor is moved to left most position
-			do {
-				lcd_putc(' ');
-			} while(lcd_state.current_column);
-			return;
-		}
 		else
-			// non-printable character. skip it
-			return;
+			// handle control characters
+			switch(c)
+			{
+			case '\n':
+				// new line: new line, then do carriage return
+				if(++lcd_state.current_line >= 8)
+					// scroll or wrap, depending if we have a framebuffer and scrolling state
+					if(lcd_state.framebuffer != NULL && (lcd_state.flags & LCD_FLAG_SCROLL)) {
+						lcd_state.current_line = 7;
+						lcd_scroll();
+					}
+			case '\r':
+				// carriage return: move cursor to beginning of current line
+				lcd_set_cursor(lcd_state.current_line, 0);
+				return;
+			case '\f':
+				// form feed: clear screen
+				lcd_clear();
+				return;
+			default:
+				// non-printable character. skip it
+				return;
+			}
 	}
 	// advance cursor/scroll
 	if((lcd_state.current_column += 6) >= 96) {

@@ -60,22 +60,33 @@
 #define LCD_FLAG_SCROLL    1       // scrolling is on
 #define LCD_FLAG_UTF8CYR   2       // use UTF-8 for cyrillic strings, not Windows-1251
 
+typedef void (*lcd_wait_func_t)(uint32_t);
+
 typedef struct {
-	uint32_t *framebuffer;    // uint32_t for fast 32bit operations
-	uint16_t  flags;          // scrolling, encoding, etc
-	uint8_t   current_line;   // text line, [0..7] (8th is not used)
-	uint8_t   current_column; // graphics column, not text! [0..95]
+	uint32_t       *framebuffer;    // uint32_t for fast 32bit operations
+	lcd_wait_func_t wait_func;
+	uint16_t        flags;          // scrolling, encoding, etc
+	uint8_t         current_line;   // text line, [0..7] (8th is not used)
+	uint8_t         current_column; // graphics column, not text! [0..95]
 } lcd_state_t;
 
 /*
  * \brief Initialize display
  * \return 0 if successful. At the time, there is no checks for success, so 0 returned always.
- *         Maybe sometime read mode will be implemented to obtain init status.
+ *         TODO: Maybe sometime read mode will be implemented to obtain init status.
  * \param framebuffer pointer to 96*9 bytes memory area to store framebuffer.
  *        Using FB makes possible pixel operations, scrolling, etc.
  *        If NULL, LCD library will be started in dumb mode.
+ * \param delay_func function to do delays in init process, takes number of milliseconds
+ *        as an argument. If NULL, dumb loop delay will be used.
  */
-uint16_t lcd_init(uint32_t *framebuffer);
+uint16_t lcd_init(uint32_t *framebuffer, lcd_wait_func_t wait_func);
+
+/*
+ * dumb loop wait function, used in display init, if no user wait function provided
+ * \param msec milliseconds to wait
+ */
+void lcd_dumb_wait(uint32_t msec);
 
 /*
  * \brief Copy framebuffer (if exists) to display.

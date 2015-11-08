@@ -27,9 +27,28 @@ lcd_state_t lcd_state;
 GPIO_InitTypeDef lcd_gpio_config;
 SPI_InitTypeDef  lcd_spi_config;
 
-uint16_t lcd_init(uint32_t *framebuffer)
+void lcd_dumb_wait(uint32_t msec)
+{
+	uint32_t i, j, k = SystemCoreClock / 11000;
+	for(i = 0; i < msec; i++)
+	{
+		for(j = 0; j < k; j++)
+			__NOP();
+	}
+}
+
+uint16_t lcd_init(uint32_t *framebuffer, lcd_wait_func_t wait_func)
 {
 	uint16_t i;
+
+	// use framebuffer
+	lcd_state.framebuffer = framebuffer;
+	// scrolling is on by default, if we have a framebuffer
+	// UTF-8 is on by default, because I use Eclipse
+	lcd_state.flags = framebuffer != NULL ? LCD_FLAG_SCROLL|LCD_FLAG_UTF8CYR : LCD_FLAG_UTF8CYR;
+	// use user :) wait function or default one
+	lcd_state.wait_func = wait_func == NULL ? lcd_dumb_wait : wait_func;
+
 	// init clocks
 	RCC_APB2PeriphClockCmd(LCD_SPI_CLK, ENABLE);
 	RCC_AHBPeriphClockCmd(LCD_GPIO_CLK, ENABLE);
@@ -89,8 +108,8 @@ uint16_t lcd_init(uint32_t *framebuffer)
 
 	// finally, send RESET signal
 	GPIO_ResetBits(LCD_PORT, LCD_RESET_PIN);
-	// TODO: replace dht22_wait to more or less standard delay function
-	dht22_wait(SystemCoreClock / (1000000 / 5000)); // let RESET last 5 msec!
+
+	lcd_state.wait_func(5); // let RESET last 5 msec!
 	GPIO_SetBits(LCD_PORT, LCD_RESET_PIN);
 
 //	// send Reading Mode command
@@ -105,16 +124,10 @@ uint16_t lcd_init(uint32_t *framebuffer)
 	// send command of internal display reset
 	lcd_write_command(0xE2);
 	// wait...
-	dht22_wait(SystemCoreClock /(1000000 / 20000));
+	lcd_state.wait_func(20);
 	// send init commands to display
 	for(i = 0; i < sizeof(lcd_init_sequence); i++)
 		lcd_write_command(lcd_init_sequence[i]);
-
-	// use framebuffer
-	lcd_state.framebuffer = framebuffer;
-	// scrolling is on by default, if we have a framebuffer
-	// UTF-8 is on by default, because I use Eclipse
-	lcd_state.flags = framebuffer != NULL ? LCD_FLAG_SCROLL|LCD_FLAG_UTF8CYR : LCD_FLAG_UTF8CYR;
 
 	return 0;
 }

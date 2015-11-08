@@ -18,6 +18,11 @@ static void metering_done(dht22_t *data)
 		trace_printf("got error %d\n", data->result);
 }
 
+static void my_wait(uint32_t msec)
+{
+	dht22_wait(SystemCoreClock / 1000 * msec);
+}
+
 void main(void)
 {
 	dht22_t dht22;
@@ -27,7 +32,7 @@ void main(void)
 	uint32_t fb[96*9/4];
 	unsigned char buf[200];
 
-	lcd_init(fb);
+	lcd_init(fb, NULL);
 	lcd_clear();
 	lcd_set_flags(LCD_FLAG_SCROLL);
 	RCC_GetClocksFreq(&rcc_clocks);
@@ -60,6 +65,10 @@ void main(void)
 	// using sync version:
 	while (1)
 	{
+		SysTick_Config(10000000);
+		lcd_dumb_wait(10);
+		sprintf(buf, "\n%lu", 10000000 - SysTick->VAL);
+		lcd_puts(buf);
 		for(i = 0; i < 3000; i++)
 			dht22_wait(SystemCoreClock / 1000);
 		if(dht22_dumb_read_sensor(&dht22) == DHT22_OK)

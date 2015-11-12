@@ -14,8 +14,9 @@
 #include <unistd.h>
 #include <stdint.h>
 
-#include "bitstream.h"
-#include "microfont.h"
+#define MAX_FONT_W 32
+#define MAX_FONT_H 64
+#define FONT_CHARS 224
 
 typedef struct {
 	int index, height, width;
@@ -159,6 +160,5 @@ int main(int argc, char *argv[])
 			}
 		}
 	}
-	
 	return 0;
 }

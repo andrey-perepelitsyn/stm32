@@ -17,6 +17,11 @@ void bs_seek(bitstream_t *bs, uint32_t offset)
 	bs->mask = 1 << bs->cur_bit;
 }
 
+uint32_t bs_tell(bitstream_t *bs)
+{
+	return (bs->cur_word << 5) + bs->cur_bit;
+}
+
 void bs_init(bitstream_t *bs, uint32_t *data)
 {
 	bs->data = data;

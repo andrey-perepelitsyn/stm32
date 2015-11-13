@@ -62,12 +62,17 @@
 
 typedef void (*lcd_wait_func_t)(uint32_t);
 
+/*
+ * \brief Nokia 1100, 1110, 1110i, 1202... LCD framebuffer presentation
+ */
+typedef uint8_t lcd_framebuffer_t[9][96];
+
 typedef struct {
-	uint32_t       *framebuffer;    // uint32_t for fast 32bit operations
-	lcd_wait_func_t wait_func;
-	uint16_t        flags;          // scrolling, encoding, etc
-	uint8_t         current_line;   // text line, [0..7] (8th is not used)
-	uint8_t         current_column; // graphics column, not text! [0..95]
+	lcd_framebuffer_t *framebuffer;
+	lcd_wait_func_t    wait_func;
+	uint16_t           flags;          // scrolling, encoding, etc
+	uint8_t            current_line;   // text line, [0..7] (8th is not used)
+	uint8_t            current_column; // graphics column, not text! [0..95]
 } lcd_state_t;
 
 /*
@@ -80,7 +85,7 @@ typedef struct {
  * \param delay_func function to do delays in init process, takes number of milliseconds
  *        as an argument. If NULL, dumb loop delay will be used.
  */
-uint16_t lcd_init(uint32_t *framebuffer, lcd_wait_func_t wait_func);
+uint16_t lcd_init(framebuffer_t *framebuffer, lcd_wait_func_t wait_func);
 
 /*
  * dumb loop wait function, used in display init, if no user wait function provided

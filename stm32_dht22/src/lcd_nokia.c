@@ -37,7 +37,7 @@ void lcd_dumb_wait(uint32_t msec)
 	}
 }
 
-uint16_t lcd_init(uint32_t *framebuffer, lcd_wait_func_t wait_func)
+uint16_t lcd_init(framebuffer_t *framebuffer, lcd_wait_func_t wait_func)
 {
 	uint16_t i;
 
@@ -146,12 +146,18 @@ void lcd_set_cursor(uint8_t line, uint8_t column)
 
 void lcd_clear(void)
 {
-	uint32_t i, spaceholder = 0;
-	for(i = 0; i < 96*9/4; i++)
-		lcd_write_raw((uint8_t *) &spaceholder, 4);
-	if(lcd_state.framebuffer != NULL)
-		for(i = 0; i < 96*9/4; i++)
-			lcd_state.framebuffer[i] = 0;
+	int i;
+	uint8_t spaceholder = 0, *p = (uint8_t *)lcd_state.framebuffer;
+
+	if(lcd_state.framebuffer != NULL) {
+		for(i = 0; i < sizeof(lcd_state.framebuffer); i++)
+			*p++ = spaceholder;
+		lcd_write_raw(lcd_state.framebuffer, sizeof(lcd_state.framebuffer));
+	}
+	else
+		for(i = 0; i < sizeof(lcd_state.framebuffer); i++)
+			lcd_write_raw(&spaceholder, 1);
+
 	lcd_set_cursor(0, 0);
 }
 
@@ -172,7 +178,7 @@ void lcd_fb_write_raw(const uint8_t *data, int length)
 	uint8_t *dest;
 	lcd_write_raw(data, length);
 	if(lcd_state.framebuffer != NULL) {
-		dest = (uint8_t *)lcd_state.framebuffer + lcd_state.current_line * 96 + lcd_state.current_column;
+		dest = &(lcd_state.framebuffer[lcd_state.current_line][lcd_state.current_column]);
 		for(i = 0; i < length; i++)
 			*dest++ = *data++;
 	}
@@ -187,20 +193,23 @@ void lcd_write_command(uint8_t command)
 void lcd_fb_show(void)
 {
 	if(lcd_state.framebuffer != NULL) {
+		// set pointer to video-RAM beginning
 		lcd_write_command(0xB0);
 		lcd_write_command(0x10);
 		lcd_write_command(0x00);
-		lcd_write_raw((uint8_t *)lcd_state.framebuffer, 96*9);
+		// write data
+		lcd_write_raw(lcd_state.framebuffer, sizeof(lcd_state.framebuffer));
 		lcd_set_cursor(lcd_state.current_line, lcd_state.current_column);
 	}
 }
 
 void lcd_scroll(void)
 {
-	int i;
+	int i, j;
 	if(lcd_state.framebuffer != NULL) {
-		for(i = 0; i < 96*8/4; i++)
-			lcd_state.framebuffer[i] = lcd_state.framebuffer[i + 96/4];
+		for(i = 0; i < 8; i++)
+			for(j = 0; j < 96; j++)
+				lcd_state.framebuffer[i][j] = lcd_state.framebuffer[i+1][j];
 		lcd_fb_show();
 	}
 }

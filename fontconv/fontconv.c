@@ -115,7 +115,7 @@ int make_microfont(const char_data_t *chars, microfont_t *font)
 				bs_write_bit(&bs, chars[i].bits[n][j]);
 	}
 
-	return sizeof(microfont_t) + (((bs_tell(&bs) + 31) >> 5) << 2);
+	return ((bs_tell(&bs) + 31) >> 5) << 2;
 }
 
 void die(const char *reason, const char *arg)
@@ -128,7 +128,7 @@ void die(const char *reason, const char *arg)
 
 int main(int argc, char *argv[])
 {
-	int i, j, k, c, fontSize = 0, mfBytes;
+	int i, j, k, c, mfBytes;
 	FILE *src, *dst;
 	char *srcFileName = NULL, *dstFileName = NULL;
 	char_data_t char_data[MF_FONT_CHARS];
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 
 	opterr = 0;
 
-	while((c = getopt(argc, argv, "hs:i:o:")) != -1)
+	while((c = getopt(argc, argv, "hi:o:")) != -1)
 		switch(c)
 		{
 		case 'i':
@@ -159,9 +159,6 @@ int main(int argc, char *argv[])
 			fputs(	"Tool for converting BDF font format to lcd_display font\n"
 					"\nUsage:\n\tfontconv -s <size> [-i <source>] [-o <destination>]\n\n", stderr);
 			return 1;
-		case 's':
-			fontSize = atoi(optarg);
-			break;
 		case '?':
 			if(optopt == 's')
 				fprintf(stderr, "Option -%c requires an argument.\n", optopt);
@@ -173,10 +170,6 @@ int main(int argc, char *argv[])
 		}
 
 	fprintf(stderr, "source: '%s', destination: '%s'\n", srcFileName, dstFileName);
-//	if(fontSize == 0) {
-//		fputs("font size is not defined!\n", stderr);
-//		return 1;
-//	}
 	if(srcFileName == NULL)
 		src = stdin;
 	if(dstFileName == NULL)
@@ -214,12 +207,27 @@ int main(int argc, char *argv[])
 	
 	mf = (microfont_t *)malloc(sizeof(microfont_t) + MF_MAX_FONT_DATA);
 	mfBytes = make_microfont(char_data, mf);
-	fprintf(stderr, "microfont size: %d\n", mfBytes);
+	fprintf(stderr, "microfont size: %d\n", sizeof(microfont_t) + mfBytes);
 	
-	if(fwrite(mf, mfBytes, 1, dst) != 1) {
-		perror("unable to write to destination");
-		return 1;
+	fprintf(dst,
+		"// microfont generated from %s\n"
+		"#include \"microfont.h\"\n\n"
+		"microfont_t mf_data = {\n"
+		"\t0xface, %d, %d,\n\t{", srcFileName, mf->height, mf->widthbits);
+	for(i = 0; i < MF_FONT_CHARS - 1; i++)
+	{
+		if((i & 7) == 0)
+			fprintf(dst, "\n\t\t");
+		fprintf(dst, "0x%04x, ", mf->index[i]);
 	}
-
+	fprintf(dst, "0x%04x\n\t},\n\t{\n\t\t", mf->index[MF_FONT_CHARS - 1]);
+	for(i = 0; i < (mfBytes >> 2) - 1; i++)
+	{
+		fprintf(dst, "0x%08x, ", mf->bits[i]);
+		if((i % 5) == 4)
+			fprintf(dst, "\n\t\t");
+	}
+	fprintf(dst, "0x%08x\n\t}\n};\n", mf->bits[(mfBytes >> 2) - 1]);
+	
 	return 0;
 }

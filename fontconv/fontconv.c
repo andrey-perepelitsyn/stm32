@@ -72,12 +72,12 @@ int bdf_read_char(FILE *f, char_data_t *c)
 
 int make_microfont(const char_data_t *chars, microfont_t *font)
 {
-	int i, j, n;
+	int i, j, n, max_w;
 	bitstream_t bs;
 	
 	font->magic = 0xface;
 	font->height = 1;
-	font->widthbits = 1;
+	max_w = 0;
 	for(i = 0; i < MF_FONT_CHARS; i++)
 	{
 		if(chars[i].index == 0 || chars[i].width == 0 || chars[i].height == 0)
@@ -85,11 +85,16 @@ int make_microfont(const char_data_t *chars, microfont_t *font)
 //		fprintf(stderr, "i: %02x, w: %d, h: %d\n", i, chars[i].width, chars[i].height);
 		if(chars[i].height > font->height)
 			font->height = chars[i].height;
-		j = 0;
-		for(n = chars[i].width - 1; n != 0; n >>= 1)
-			j++;
-		if(j > font->widthbits)
-			font->widthbits = j;
+		if(chars[i].width > max_w)
+			max_w = chars[i].width;
+	}
+	// width cannot be 0, so we can safely decrement it and save 1 bit when width=8 :)
+	max_w--;
+	font->widthbits = 0;
+	while(max_w)
+	{
+		font->widthbits++;
+		max_w >>= 1;
 	}
 	fprintf(stderr, "widthbits: %d, height: %d\n", font->widthbits, font->height);
 	
@@ -104,10 +109,11 @@ int make_microfont(const char_data_t *chars, microfont_t *font)
 			fprintf(stderr, "char %02x won't fit!\n", i + MF_FIRST_CHAR);
 			return -1;
 		}
-		font->index[i] = bs_tell(&bs);
-		bs_write_bits(&bs, chars[i].width, font->widthbits);
 		fprintf(stderr, "%02x '%c', w:%2d, offset: %d\n",
 			i + MF_FIRST_CHAR, i + MF_FIRST_CHAR, chars[i].width, bs_tell(&bs));
+
+		font->index[i] = bs_tell(&bs);
+		bs_write_bits(&bs, chars[i].width - 1, font->widthbits);
 		
 		// TODO: let choose bitstream direction, now only "up-down" implemented
 		for(j = 0; j < chars[i].width; j++)
@@ -223,7 +229,7 @@ int main(int argc, char *argv[])
 	fprintf(dst, "0x%04x\n\t},\n\t{\n\t\t", mf->index[MF_FONT_CHARS - 1]);
 	for(i = 0; i < (mfBytes >> 2) - 1; i++)
 	{
-		fprintf(dst, "0x%08x, ", mf->bits[i]);
+		fprintf(dst, "0x%08x /* %4d */, ", mf->bits[i], i << 5);
 		if((i % 5) == 4)
 			fprintf(dst, "\n\t\t");
 	}

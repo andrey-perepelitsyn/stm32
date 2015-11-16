@@ -69,8 +69,19 @@ int bdf_read_char(FILE *f, char_data_t *c)
 	return 0;
 }
 
+int char_cmp(const char_data_t *c1, const char_data_t *c2)
+{
+	int i, j;
+	if(c1->height != c2->height || c1->width != c2->width)
+		return 1;
+	for(i = 0; i < c1->height; i++)
+		for(j = 0; j < c1->width; j++)
+			if(c1->bits[i][j] != c2->bits[i][j])
+				return 1;
+	return 0;
+}
 
-int make_microfont(const char_data_t *chars, microfont_t *font)
+int make_microfont(const char_data_t *chars, microfont_t *font, int duplicateBitmaps)
 {
 	int i, j, n, max_w;
 	bitstream_t bs;
@@ -109,6 +120,19 @@ int make_microfont(const char_data_t *chars, microfont_t *font)
 			fprintf(stderr, "char %02x won't fit!\n", i + MF_FIRST_CHAR);
 			return -1;
 		}
+		if(!duplicateBitmaps) {
+			// try to find same looking chars from already added to font
+			for(j = 0; j < i; j++)
+				if(char_cmp(&(chars[i]), &(chars[j])) == 0) {
+					// found! lets duplicate pointer, not bitmap
+					font->index[i] = font->index[j];
+					fprintf(stderr, "found dup char: 0x%02x '%c' looks same as 0x%02x '%c'\n",
+						i + MF_FIRST_CHAR, i + MF_FIRST_CHAR, j + MF_FIRST_CHAR, j + MF_FIRST_CHAR);
+					break;
+				}
+			if(j < i)
+				continue; // duplicate found and added, go to next char
+		}
 		fprintf(stderr, "%02x '%c', w:%2d, offset: %d\n",
 			i + MF_FIRST_CHAR, i + MF_FIRST_CHAR, chars[i].width, bs_tell(&bs));
 
@@ -124,6 +148,24 @@ int make_microfont(const char_data_t *chars, microfont_t *font)
 	return ((bs_tell(&bs) + 31) >> 5) << 2;
 }
 
+void debug_show_font(char_data_t *chars)
+{
+	int i, j, k;
+ 	for(i = 0; i < MF_FONT_CHARS; i++)
+	{
+		if(chars[i].index) {
+			fprintf(stderr, "i: 0x%02x '%c', h: %d, w: %d\n",
+					chars[i].index, chars[i].index, chars[i].height, chars[i].width);
+			for(j = 0; j < chars[i].height; j++)
+			{
+				for(k = 0; k < chars[i].width; k++)
+					fputc(chars[i].bits[j][k] ? '#' : '.', stderr);
+				fputc('\n', stderr);
+			}
+		}
+	}
+}
+
 void die(const char *reason, const char *arg)
 {
 	fprintf(stderr, reason, arg);
@@ -134,7 +176,7 @@ void die(const char *reason, const char *arg)
 
 int main(int argc, char *argv[])
 {
-	int i, j, k, c, mfBytes;
+	int i, j, k, c, mfBytes, duplicateBitmaps = 0;
 	FILE *src, *dst;
 	char *srcFileName = NULL, *dstFileName = NULL;
 	char_data_t char_data[MF_FONT_CHARS];
@@ -142,7 +184,7 @@ int main(int argc, char *argv[])
 
 	opterr = 0;
 
-	while((c = getopt(argc, argv, "hi:o:")) != -1)
+	while((c = getopt(argc, argv, "dhi:o:")) != -1)
 		switch(c)
 		{
 		case 'i':
@@ -163,8 +205,13 @@ int main(int argc, char *argv[])
 			break;
 		case 'h':
 			fputs(	"Tool for converting BDF font format to lcd_display font\n"
-					"\nUsage:\n\tfontconv -s <size> [-i <source>] [-o <destination>]\n\n", stderr);
+					"\nUsage:\n\tfontconv -s <size> [-i <source>] [-o <destination>]\n"
+					"\n\t-d\tstore bitmaps for equally looking chars.\n"
+					"\t\totherwise, store only one bitmap for such chars.\n", stderr);
 			return 1;
+		case 'd':
+			duplicateBitmaps = 1;
+			break;
 		case '?':
 			if(optopt == 's')
 				fprintf(stderr, "Option -%c requires an argument.\n", optopt);
@@ -195,24 +242,8 @@ int main(int argc, char *argv[])
 		char_data[ch.index - 32] = ch;
 	}
 
-/*	//visual test:)
- 	for(i = 0; i < MF_FONT_CHARS; i++)
-	{
-		if(char_data[i].index) {
-			fprintf(stderr, "i: 0x%02x '%c', h: %d, w: %d\n",
-					char_data[i].index, char_data[i].index, char_data[i].height, char_data[i].width);
-			for(j = 0; j < char_data[i].height; j++)
-			{
-				for(k = 0; k < char_data[i].width; k++)
-					fputc(char_data[i].bits[j][k] ? '#' : '.', stderr);
-				fputc('\n', stderr);
-			}
-		}
-	}
- */	
-	
 	mf = (microfont_t *)malloc(sizeof(microfont_t) + MF_MAX_FONT_DATA);
-	mfBytes = make_microfont(char_data, mf);
+	mfBytes = make_microfont(char_data, mf, duplicateBitmaps);
 	fprintf(stderr, "microfont size: %d\n", sizeof(microfont_t) + mfBytes);
 	
 	fprintf(dst,
